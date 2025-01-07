@@ -27,9 +27,11 @@ function retry (fn, cb) {
 }
 
 function captureAndVerify (title, expectedPath, cb) {
-  captureWindow('Finder', title, function (err, pngPath) {
-    if (err) return cb(err)
-
+  const captureWindowPromise = captureWindow('Finder', title)
+  captureWindowPromise.catch(function (err) {
+    cb(err)
+  })
+  captureWindowPromise.then(function (pngPath) {
     const actualSize = sizeOf(pngPath)
     const expectedSize = sizeOf(expectedPath)
 
@@ -51,9 +53,11 @@ function captureAndVerify (title, expectedPath, cb) {
 }
 
 function captureAndSaveDiff (title, expectedPath, cb) {
-  captureWindow('Finder', title, function (err, pngPath) {
-    if (err) return cb(err)
-
+  const captureWindowPromise = captureWindow('Finder', title)
+  captureWindowPromise.catch(function (err) {
+    cb(err)
+  })
+  captureWindowPromise.then(function (pngPath) {
     const opts = Object.assign({
       reference: expectedPath,
       current: pngPath,
