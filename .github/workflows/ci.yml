@@ -10,13 +10,14 @@ on:
 
 jobs:
   build:
-    name: build (node v${{ matrix.node }})
+    name: build (node v${{ matrix.node }} ${{ matrix.os }})
     
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
     
     strategy:
       fail-fast: false
       matrix:
+        os: [ macos-13, macos-15 ]
         node: [ 18, 20 ]
 
     steps:
