@@ -1,0 +1,35 @@
+name: ci
+
+permissions:
+  contents: read
+
+on:
+  push:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: build (node v${{ matrix.node }})
+    
+    runs-on: macos-latest
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [ 18, 20 ]
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      
+      - name: npm ci
+        run: npm ci
+
+      - name: npm test
+        run: npm test
