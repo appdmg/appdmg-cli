@@ -11,7 +11,7 @@ const appdmg = require('../..')
 const { parseMountPath } = require('../../lib/darwin/hdiutil')
 
 const execFileAsync = promisify(execFile)
-const macOSTest = process.platform === 'darwin' ? test : test.skip
+const macOSTest = process.platform === 'darwin' ? test.serial : test.skip
 
 macOSTest('creates and inspects a modern DMG specification', async (t) => {
   const tmpDir = await makeTempDir(t)

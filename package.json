@@ -35,7 +35,7 @@
   },
   "scripts": {
     "test": "ava test/*.test.js",
-    "test:integration": "ava test/integration/**/*.test.js"
+    "test:integration": "ava --timeout=2m --serial test/integration/**/*.test.js"
   },
   "dependencies": {
     "@appdmg/ds-store": "~1.0.0",
