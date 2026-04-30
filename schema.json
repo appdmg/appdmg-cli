@@ -1,7 +1,13 @@
 {
-  "$schema": "http://json-schema.org/draft-04/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.appdmg.dev/appdmg.schema.json",
+  "title": "appdmg specification",
   "type": "object",
   "additionalProperties": false,
+  "required": [
+    "title",
+    "contents"
+  ],
   "properties": {
     "title": {
       "type": "string"
@@ -21,24 +27,18 @@
     },
     "window": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "position": {
-          "type": "object",
-          "properties": {
-            "x": {
-              "type": "integer"
-            },
-            "y": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "x",
-            "y"
-          ]
+          "$ref": "#/$defs/point"
         },
         "size": {
           "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "width",
+            "height"
+          ],
           "properties": {
             "width": {
               "type": "integer"
@@ -46,11 +46,7 @@
             "height": {
               "type": "integer"
             }
-          },
-          "required": [
-            "width",
-            "height"
-          ]
+          }
         }
       }
     },
@@ -77,6 +73,13 @@
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y",
+          "type",
+          "path"
+        ],
         "properties": {
           "x": {
             "type": "integer"
@@ -98,17 +101,15 @@
           "name": {
             "type": "string"
           }
-        },
-        "required": [
-          "x",
-          "y",
-          "type",
-          "path"
-        ]
+        }
       }
     },
     "code-sign": {
       "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signing-identity"
+      ],
       "properties": {
         "signing-identity": {
           "type": "string"
@@ -116,14 +117,25 @@
         "identifier": {
           "type": "string"
         }
-      },
-      "required": [
-        "signing-identity"
-      ]
+      }
     }
   },
-  "required": [
-    "title",
-    "contents"
-  ]
+  "$defs": {
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y"
+      ],
+      "properties": {
+        "x": {
+          "type": "integer"
+        },
+        "y": {
+          "type": "integer"
+        }
+      }
+    }
+  }
 }
