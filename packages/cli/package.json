@@ -1,0 +1,51 @@
+{
+  "name": "@appdmg/cli",
+  "version": "1.0.0",
+  "description": "Command line interface for @appdmg/appdmg.",
+  "license": "MIT",
+  "author": "Linus Unnebäck <linus@folkdatorn.se>",
+  "contributors": [
+    "Linus Unnebäck <linus@folkdatorn.se>",
+    "Jozef Izso <jozef.izso@gmail.com>"
+  ],
+  "bin": {
+    "appdmg-cli": "bin/appdmg-cli.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/appdmg/appdmg-cli.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/appdmg/appdmg-cli/issues"
+  },
+  "homepage": "https://github.com/appdmg/appdmg-cli/tree/main/packages/cli#readme",
+  "keywords": [
+    "appdmg",
+    "dmg",
+    "macos",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "ava"
+  },
+  "dependencies": {
+    "@appdmg/appdmg": "1.0.0"
+  },
+  "devDependencies": {
+    "ava": "~8.0.0"
+  },
+  "overrides": {
+    "js-yaml": "~3.14.2",
+    "lodash": "~4.18.1"
+  }
+}

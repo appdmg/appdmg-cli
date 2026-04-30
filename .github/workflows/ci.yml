@@ -10,8 +10,8 @@ on:
       - main
 
 jobs:
-  unit:
-    name: unit node v24 ${{ matrix.os }}
+  appdmg:
+    name: appdmg node v24 ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -45,3 +45,37 @@ jobs:
       - run: node --check lib/spec/validate.js
       - run: node --check test/errors.test.js
       - run: node --check test/library.test.js
+
+  cli:
+    name: cli node v24 ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-15-intel
+
+    defaults:
+      run:
+        working-directory: packages/cli
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: packages/cli/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm audit --audit-level=moderate
+      - run: npm ls --omit=dev --all
+      - run: npm pack --dry-run
+      - run: node --check bin/appdmg-cli.js
+      - run: node --check lib/args.js
+      - run: node --check lib/main.js
+      - run: node --check lib/render-progress.js
+      - run: node --check test/args.test.js
+      - run: node --check test/main.test.js
