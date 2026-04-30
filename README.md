@@ -6,6 +6,13 @@ This is the Node.js 24+ CommonJS modernization of the original `appdmg`
 library. The first stage keeps the JSON format and the EventEmitter API while
 moving the maintained package under the `@appdmg` npm scope.
 
+Related package:
+
+- `@appdmg/cli` provides the `appdmg-cli` command-line executable.
+
+See [docs/node24-migration.md](docs/node24-migration.md) for the v1.0.0
+migration and release notes.
+
 ## Installation
 
 ```sh
@@ -63,6 +70,22 @@ const { appdmg, schema, AppDmgError } = require('@appdmg/appdmg')
 `schema` is the exported JSON Schema 2020-12 document. It is public API, but
 runtime validation is intentionally limited to basic data type and required
 field checks in this stage.
+
+The schema can also be loaded directly:
+
+```javascript
+const schema = require('@appdmg/appdmg/schema.json')
+```
+
+## Migration Notes
+
+The old unscoped package is not reused for the Node.js 24 release. Install
+`@appdmg/appdmg` for library usage and `@appdmg/cli` for the executable.
+
+The library keeps the `appdmg(options)` EventEmitter contract and still parses
+the existing JSON specification format, including legacy conversion. The first
+intentional breaks are package naming, the Node.js `>=24` runtime floor, and
+the separate CLI package.
 
 ## JSON Specification
 
