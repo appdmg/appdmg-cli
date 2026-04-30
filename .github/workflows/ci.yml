@@ -79,3 +79,20 @@ jobs:
       - run: node --check lib/render-progress.js
       - run: node --check test/args.test.js
       - run: node --check test/main.test.js
+
+  integration:
+    name: integration node v24 macos-15-intel
+    runs-on: macos-15-intel
+    needs:
+      - appdmg
+      - cli
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:integration
+      - run: node --check test/integration/dmg.test.js

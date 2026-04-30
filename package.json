@@ -34,7 +34,8 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "ava"
+    "test": "ava test/*.test.js",
+    "test:integration": "ava test/integration/**/*.test.js"
   },
   "dependencies": {
     "@appdmg/ds-store": "~1.0.0",
@@ -47,10 +48,5 @@
   "overrides": {
     "js-yaml": "~3.14.2",
     "lodash": "~4.18.1"
-  },
-  "ava": {
-    "files": [
-      "test/**/*.test.js"
-    ]
   }
 }
