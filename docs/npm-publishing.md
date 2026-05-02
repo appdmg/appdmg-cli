@@ -31,8 +31,13 @@ Trusted Publishing works.
 Each publish workflow:
 
 - runs on a GitHub-hosted runner with `id-token: write`;
+- ignores GitHub prereleases so prerelease tags cannot publish the npm `latest`
+  dist-tag by accident;
 - installs with Node.js 24;
 - runs tests, audit, and runtime dependency checks;
+- checks whether the exact package version already exists on npm so rerunning a
+  partially successful release can continue with the remaining unpublished
+  packages;
 - creates the exact npm package tarball with `npm pack`;
 - creates a GitHub artifact attestation for that `.tgz`;
 - uploads the `.tgz` as a workflow artifact;
