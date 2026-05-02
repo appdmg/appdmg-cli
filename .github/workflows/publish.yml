@@ -1,0 +1,123 @@
+name: publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+jobs:
+  integration:
+    name: integration node v24 macos-15-intel
+    runs-on: macos-15-intel
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm ci --prefix packages/cli
+      - run: npm test --prefix packages/cli
+      - run: npm run test:integration
+
+  publish:
+    name: publish to npmjs
+    runs-on: ubuntu-latest
+    needs: integration
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6
+
+      - name: setup node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: verify publish toolchain
+        run: |
+          node --version
+          npm --version
+          node -e "const version = require('node:child_process').execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim(); const [major, minor, patch] = version.split('.').map(Number); if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) throw new Error('npm 11.5.1 or newer is required for trusted publishing')"
+
+      - name: install appdmg dependencies
+        run: npm ci
+
+      - name: install cli dependencies
+        run: npm ci --prefix packages/cli
+
+      - name: verify cli dependency contract
+        run: |
+          node -e "const root = require('./package.json'); const cli = require('./packages/cli/package.json'); if (cli.dependencies['@appdmg/appdmg'] !== root.version) throw new Error('@appdmg/cli must depend on the exact @appdmg/appdmg package version')"
+
+      - name: test appdmg
+        run: npm test
+
+      - name: test cli
+        run: npm test --prefix packages/cli
+
+      - name: audit appdmg dependencies
+        run: npm audit --audit-level=moderate
+
+      - name: audit cli dependencies
+        run: npm audit --audit-level=moderate --prefix packages/cli
+
+      - name: verify appdmg runtime dependency tree
+        run: npm ls --omit=dev --all
+
+      - name: verify cli runtime dependency tree
+        run: npm ls --omit=dev --all --prefix packages/cli
+
+      - name: pack appdmg package
+        id: pack_appdmg
+        run: |
+          mkdir -p dist/appdmg
+          npm pack --json --pack-destination dist/appdmg > dist/appdmg/pack.json
+          tarball="$(find dist/appdmg -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+
+      - name: pack cli package
+        id: pack_cli
+        run: |
+          mkdir -p dist/cli
+          (
+            cd packages/cli
+            npm pack --json --pack-destination ../../dist/cli > ../../dist/cli/pack.json
+          )
+          tarball="$(find dist/cli -maxdepth 1 -name '*.tgz' -print -quit)"
+          test -n "$tarball"
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+
+      - name: attest npm package artifacts
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/**/*.tgz
+
+      - name: upload npm package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-packages
+          path: dist/**/*.tgz
+          if-no-files-found: error
+
+      - name: publish appdmg package
+        run: npm publish "$TARBALL" --provenance --access public
+        env:
+          TARBALL: ${{ steps.pack_appdmg.outputs.tarball }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: publish cli package
+        run: npm publish "$TARBALL" --provenance --access public
+        env:
+          TARBALL: ${{ steps.pack_cli.outputs.tarball }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
