@@ -11,9 +11,56 @@ permissions:
   artifact-metadata: write
 
 jobs:
+  check:
+    name: check npm package versions
+    if: github.event.release.prerelease == false
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.npm_versions.outputs.should_publish }}
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6
+
+      - name: setup node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: check npm package versions
+        id: npm_versions
+        run: |
+          appdmg_name="$(node -p "require('./package.json').name")"
+          appdmg_version="$(node -p "require('./package.json').version")"
+          cli_name="$(node -p "require('./packages/cli/package.json').name")"
+          cli_version="$(node -p "require('./packages/cli/package.json').version")"
+
+          appdmg_exists=false
+          cli_exists=false
+
+          if npm view "${appdmg_name}@${appdmg_version}" version --json >/dev/null 2>&1; then
+            echo "${appdmg_name}@${appdmg_version} is already published."
+            appdmg_exists=true
+          fi
+
+          if npm view "${cli_name}@${cli_version}" version --json >/dev/null 2>&1; then
+            echo "${cli_name}@${cli_version} is already published."
+            cli_exists=true
+          fi
+
+          if [ "$appdmg_exists" = true ] || [ "$cli_exists" = true ]; then
+            echo "At least one package version is already published; exiting without publishing."
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "${appdmg_name}@${appdmg_version} and ${cli_name}@${cli_version} are not published yet; continuing."
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
   integration:
     name: integration node v24 macos-15-intel
-    if: github.event.release.prerelease == false
+    needs: check
+    if: needs.check.outputs.should_publish == 'true'
     runs-on: macos-15-intel
 
     steps:
@@ -30,9 +77,11 @@ jobs:
 
   publish:
     name: publish to npmjs
-    if: github.event.release.prerelease == false
+    needs:
+      - check
+      - integration
+    if: needs.check.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
-    needs: integration
 
     steps:
       - name: checkout
@@ -44,12 +93,6 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
           cache: npm
-
-      - name: verify publish toolchain
-        run: |
-          node --version
-          npm --version
-          node -e "const version = require('node:child_process').execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim(); const [major, minor, patch] = version.split('.').map(Number); if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) throw new Error('npm 11.5.1 or newer is required for trusted publishing')"
 
       - name: install appdmg dependencies
         run: npm ci
@@ -79,36 +122,7 @@ jobs:
       - name: verify cli runtime dependency tree
         run: npm ls --omit=dev --all --prefix packages/cli
 
-      - name: check appdmg npm package version
-        id: npm_appdmg
-        run: |
-          package_name="$(node -p "require('./package.json').name")"
-          package_version="$(node -p "require('./package.json').version")"
-
-          if npm view "${package_name}@${package_version}" version --json >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          echo "package=${package_name}@${package_version}" >> "$GITHUB_OUTPUT"
-
-      - name: check cli npm package version
-        id: npm_cli
-        run: |
-          package_name="$(node -p "require('./packages/cli/package.json').name")"
-          package_version="$(node -p "require('./packages/cli/package.json').version")"
-
-          if npm view "${package_name}@${package_version}" version --json >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          echo "package=${package_name}@${package_version}" >> "$GITHUB_OUTPUT"
-
       - name: pack appdmg package
-        if: steps.npm_appdmg.outputs.exists == 'false'
         id: pack_appdmg
         run: |
           mkdir -p dist/appdmg
@@ -118,7 +132,6 @@ jobs:
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
 
       - name: pack cli package
-        if: steps.npm_cli.outputs.exists == 'false'
         id: pack_cli
         run: |
           mkdir -p dist/cli
@@ -131,13 +144,11 @@ jobs:
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
 
       - name: attest npm package artifacts
-        if: steps.npm_appdmg.outputs.exists == 'false' || steps.npm_cli.outputs.exists == 'false'
         uses: actions/attest@v4
         with:
           subject-path: dist/**/*.tgz
 
       - name: upload npm package artifacts
-        if: steps.npm_appdmg.outputs.exists == 'false' || steps.npm_cli.outputs.exists == 'false'
         uses: actions/upload-artifact@v4
         with:
           name: npm-packages
@@ -145,14 +156,12 @@ jobs:
           if-no-files-found: error
 
       - name: publish appdmg package
-        if: steps.npm_appdmg.outputs.exists == 'false'
         run: npm publish "$TARBALL" --provenance --access public
         env:
           TARBALL: ${{ steps.pack_appdmg.outputs.tarball }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: publish cli package
-        if: steps.npm_cli.outputs.exists == 'false'
         run: npm publish "$TARBALL" --provenance --access public
         env:
           TARBALL: ${{ steps.pack_cli.outputs.tarball }}
