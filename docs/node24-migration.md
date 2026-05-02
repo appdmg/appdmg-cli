@@ -162,6 +162,10 @@ Before publishing the final CLI to npm, verify that each scoped helper package
 is available from npm at the intended version and that a clean install of
 `@appdmg/cli` resolves only npm-published artifacts.
 
+The npm release process is documented in
+[npm-publishing.md](npm-publishing.md). Packages must be published from GitHub
+Actions with provenance and package artifact attestations.
+
 ## Test coverage
 
 The rewrite is backed by AVA tests.
