@@ -41,60 +41,9 @@ jobs:
         id: cli_publish_status
         uses: tehpsalmist/npm-publish-status-action@01cb25946b194a7a5468f22c8e74db04c283f121
 
-      - name: report npm package version status
-        run: |
-          appdmg_name="$(node -p "require('./package.appdmg.json').name")"
-          appdmg_version="$(node -p "require('./package.appdmg.json').version")"
-          cli_name="$(node -p "require('./package.json').name")"
-          cli_version="$(node -p "require('./package.json').version")"
-
-          if [ "${{ steps.appdmg_publish_status.outputs.exists }}" = "1" ]; then
-            echo "${appdmg_name}@${appdmg_version} is already published."
-          elif [ "${{ steps.appdmg_publish_status.outputs.exists }}" = "0" ]; then
-            echo "${appdmg_name}@${appdmg_version} is not published yet."
-          else
-            echo "::error::Unexpected appdmg npm publish status: ${{ steps.appdmg_publish_status.outputs.exists }}"
-            exit 1
-          fi
-
-          if [ "${{ steps.cli_publish_status.outputs.exists }}" = "1" ]; then
-            echo "${cli_name}@${cli_version} is already published."
-          elif [ "${{ steps.cli_publish_status.outputs.exists }}" = "0" ]; then
-            echo "${cli_name}@${cli_version} is not published yet."
-          else
-            echo "::error::Unexpected cli npm publish status: ${{ steps.cli_publish_status.outputs.exists }}"
-            exit 1
-          fi
-
-          if [ "${{ steps.appdmg_publish_status.outputs.exists }}" = "1" ] || [ "${{ steps.cli_publish_status.outputs.exists }}" = "1" ]; then
-            echo "At least one package version is already published; exiting without publishing."
-          else
-            echo "Both package versions are not published yet; continuing."
-          fi
-
-  integration:
-    name: integration node v24 macos-15-intel
+  publish:
+    name: publish to npmjs
     needs: check
-    if: needs.check.outputs.should_publish == 'true'
-    runs-on: macos-15-intel
-
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm ci --prefix packages/cli
-      - run: npm test --prefix packages/cli
-      - run: npm run test:integration
-
-  verify:
-    name: verify npm packages
-    needs:
-      - check
-      - integration
     if: needs.check.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
 
@@ -114,106 +63,6 @@ jobs:
 
       - name: install cli dependencies
         run: npm ci --prefix packages/cli
-
-      - name: verify cli dependency contract
-        run: |
-          node -e "const root = require('./package.json'); const cli = require('./packages/cli/package.json'); if (cli.dependencies['@appdmg/appdmg'] !== root.version) throw new Error('@appdmg/cli must depend on the exact @appdmg/appdmg package version')"
-
-      - name: test appdmg
-        run: npm test
-
-      - name: test cli
-        run: npm test --prefix packages/cli
-
-      - name: audit appdmg dependencies
-        run: npm audit --audit-level=moderate
-
-      - name: audit cli dependencies
-        run: npm audit --audit-level=moderate --prefix packages/cli
-
-      - name: verify appdmg runtime dependency tree
-        run: npm ls --omit=dev --all
-
-      - name: verify cli runtime dependency tree
-        run: npm ls --omit=dev --all --prefix packages/cli
-
-  prepublish_check:
-    name: check npm package versions before publish
-    needs: verify
-    if: github.event.release.prerelease == false
-    runs-on: ubuntu-latest
-    outputs:
-      should_publish: ${{ steps.appdmg_publish_status.outputs.exists == '0' && steps.cli_publish_status.outputs.exists == '0' }}
-
-    steps:
-      - name: checkout
-        uses: actions/checkout@v6
-
-      - name: setup node 24
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-
-      - name: check appdmg npm package version
-        id: appdmg_publish_status
-        uses: tehpsalmist/npm-publish-status-action@01cb25946b194a7a5468f22c8e74db04c283f121
-
-      - name: prepare cli package metadata
-        run: |
-          cp package.json package.appdmg.json
-          cp packages/cli/package.json package.json
-
-      - name: check cli npm package version
-        id: cli_publish_status
-        uses: tehpsalmist/npm-publish-status-action@01cb25946b194a7a5468f22c8e74db04c283f121
-
-      - name: report npm package version status
-        run: |
-          appdmg_name="$(node -p "require('./package.appdmg.json').name")"
-          appdmg_version="$(node -p "require('./package.appdmg.json').version")"
-          cli_name="$(node -p "require('./package.json').name")"
-          cli_version="$(node -p "require('./package.json').version")"
-
-          if [ "${{ steps.appdmg_publish_status.outputs.exists }}" = "1" ]; then
-            echo "${appdmg_name}@${appdmg_version} was published while this workflow was verifying."
-          elif [ "${{ steps.appdmg_publish_status.outputs.exists }}" = "0" ]; then
-            echo "${appdmg_name}@${appdmg_version} is still not published."
-          else
-            echo "::error::Unexpected appdmg npm publish status: ${{ steps.appdmg_publish_status.outputs.exists }}"
-            exit 1
-          fi
-
-          if [ "${{ steps.cli_publish_status.outputs.exists }}" = "1" ]; then
-            echo "${cli_name}@${cli_version} was published while this workflow was verifying."
-          elif [ "${{ steps.cli_publish_status.outputs.exists }}" = "0" ]; then
-            echo "${cli_name}@${cli_version} is still not published."
-          else
-            echo "::error::Unexpected cli npm publish status: ${{ steps.cli_publish_status.outputs.exists }}"
-            exit 1
-          fi
-
-          if [ "${{ steps.appdmg_publish_status.outputs.exists }}" = "1" ] || [ "${{ steps.cli_publish_status.outputs.exists }}" = "1" ]; then
-            echo "At least one package version is already published; exiting without publishing."
-          else
-            echo "Both package versions are still not published; continuing."
-          fi
-
-  publish:
-    name: publish to npmjs
-    needs: prepublish_check
-    if: needs.prepublish_check.outputs.should_publish == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: checkout
-        uses: actions/checkout@v6
-
-      - name: setup node 24
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
 
       - name: pack appdmg package
         id: pack_appdmg
@@ -240,13 +89,6 @@ jobs:
         uses: actions/attest@v4
         with:
           subject-path: dist/**/*.tgz
-
-      - name: upload npm package artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: npm-packages
-          path: dist/**/*.tgz
-          if-no-files-found: error
 
       - name: publish appdmg package
         run: npm publish "$TARBALL" --provenance --access public

@@ -33,27 +33,22 @@ Each publish workflow:
 - runs on a GitHub-hosted runner with `id-token: write`;
 - ignores GitHub prereleases so prerelease tags cannot publish the npm `latest`
   dist-tag by accident;
-- checks whether the exact package version already exists on npm before running
-  verification work;
-- installs with Node.js 24;
-- runs tests, audit, and runtime dependency checks;
-- re-checks the exact package version with
+- checks whether the exact package version already exists on npm with
   `tehpsalmist/npm-publish-status-action` pinned to
-  `01cb25946b194a7a5468f22c8e74db04c283f121` immediately before the publish
-  job;
+  `01cb25946b194a7a5468f22c8e74db04c283f121`;
+- installs with Node.js 24;
+- installs dependencies with `npm ci`;
 - creates the exact npm package tarball with `npm pack`;
 - creates a GitHub artifact attestation for that `.tgz`;
-- uploads the `.tgz` as a workflow artifact;
 - publishes the same `.tgz` to npm with provenance enabled.
 
 If the exact package version is already published, the publish path exits
-without running the package, attestation, upload, or npm publish steps.
+without running the package, attestation, or npm publish steps. Build, test,
+audit, and runtime dependency checks remain in the normal build/CI workflows.
 
 The appdmg CLI repository publishes two packages from one workflow. It publishes
-`@appdmg/appdmg` first, then `@appdmg/cli`, and verifies that the CLI depends on
-the exact library package version. If either package version is already
-published, the workflow exits without publishing either package. That keeps the
-release contract simple and avoids mixing old and new artifacts for one release.
+`@appdmg/appdmg` first, then `@appdmg/cli`. If either package version is already
+published, the workflow exits without publishing either package.
 
 ## Release order
 
