@@ -34,9 +34,13 @@ Each publish workflow:
 - ignores GitHub prereleases so prerelease tags cannot publish the npm `latest`
   dist-tag by accident;
 - checks whether the exact package version already exists on npm before running
-  tests, package creation, attestation, or publishing;
+  verification work;
 - installs with Node.js 24;
 - runs tests, audit, and runtime dependency checks;
+- re-checks the exact package version with
+  `tehpsalmist/npm-publish-status-action` pinned to
+  `01cb25946b194a7a5468f22c8e74db04c283f121` immediately before the publish
+  job;
 - creates the exact npm package tarball with `npm pack`;
 - creates a GitHub artifact attestation for that `.tgz`;
 - uploads the `.tgz` as a workflow artifact;

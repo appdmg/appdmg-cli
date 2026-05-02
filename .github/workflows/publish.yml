@@ -16,7 +16,7 @@ jobs:
     if: github.event.release.prerelease == false
     runs-on: ubuntu-latest
     outputs:
-      should_publish: ${{ steps.npm_versions.outputs.should_publish }}
+      should_publish: ${{ steps.appdmg_publish_status.outputs.exists == '0' && steps.cli_publish_status.outputs.exists == '0' }}
 
     steps:
       - name: checkout
@@ -28,33 +28,48 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: check npm package versions
-        id: npm_versions
+      - name: check appdmg npm package version
+        id: appdmg_publish_status
+        uses: tehpsalmist/npm-publish-status-action@01cb25946b194a7a5468f22c8e74db04c283f121
+
+      - name: prepare cli package metadata
         run: |
-          appdmg_name="$(node -p "require('./package.json').name")"
-          appdmg_version="$(node -p "require('./package.json').version")"
-          cli_name="$(node -p "require('./packages/cli/package.json').name")"
-          cli_version="$(node -p "require('./packages/cli/package.json').version")"
+          cp package.json package.appdmg.json
+          cp packages/cli/package.json package.json
 
-          appdmg_exists=false
-          cli_exists=false
+      - name: check cli npm package version
+        id: cli_publish_status
+        uses: tehpsalmist/npm-publish-status-action@01cb25946b194a7a5468f22c8e74db04c283f121
 
-          if npm view "${appdmg_name}@${appdmg_version}" version --json >/dev/null 2>&1; then
+      - name: report npm package version status
+        run: |
+          appdmg_name="$(node -p "require('./package.appdmg.json').name")"
+          appdmg_version="$(node -p "require('./package.appdmg.json').version")"
+          cli_name="$(node -p "require('./package.json').name")"
+          cli_version="$(node -p "require('./package.json').version")"
+
+          if [ "${{ steps.appdmg_publish_status.outputs.exists }}" = "1" ]; then
             echo "${appdmg_name}@${appdmg_version} is already published."
-            appdmg_exists=true
-          fi
-
-          if npm view "${cli_name}@${cli_version}" version --json >/dev/null 2>&1; then
-            echo "${cli_name}@${cli_version} is already published."
-            cli_exists=true
-          fi
-
-          if [ "$appdmg_exists" = true ] || [ "$cli_exists" = true ]; then
-            echo "At least one package version is already published; exiting without publishing."
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.appdmg_publish_status.outputs.exists }}" = "0" ]; then
+            echo "${appdmg_name}@${appdmg_version} is not published yet."
           else
-            echo "${appdmg_name}@${appdmg_version} and ${cli_name}@${cli_version} are not published yet; continuing."
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "::error::Unexpected appdmg npm publish status: ${{ steps.appdmg_publish_status.outputs.exists }}"
+            exit 1
+          fi
+
+          if [ "${{ steps.cli_publish_status.outputs.exists }}" = "1" ]; then
+            echo "${cli_name}@${cli_version} is already published."
+          elif [ "${{ steps.cli_publish_status.outputs.exists }}" = "0" ]; then
+            echo "${cli_name}@${cli_version} is not published yet."
+          else
+            echo "::error::Unexpected cli npm publish status: ${{ steps.cli_publish_status.outputs.exists }}"
+            exit 1
+          fi
+
+          if [ "${{ steps.appdmg_publish_status.outputs.exists }}" = "1" ] || [ "${{ steps.cli_publish_status.outputs.exists }}" = "1" ]; then
+            echo "At least one package version is already published; exiting without publishing."
+          else
+            echo "Both package versions are not published yet; continuing."
           fi
 
   integration:
@@ -75,8 +90,8 @@ jobs:
       - run: npm test --prefix packages/cli
       - run: npm run test:integration
 
-  publish:
-    name: publish to npmjs
+  verify:
+    name: verify npm packages
     needs:
       - check
       - integration
@@ -121,6 +136,84 @@ jobs:
 
       - name: verify cli runtime dependency tree
         run: npm ls --omit=dev --all --prefix packages/cli
+
+  prepublish_check:
+    name: check npm package versions before publish
+    needs: verify
+    if: github.event.release.prerelease == false
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.appdmg_publish_status.outputs.exists == '0' && steps.cli_publish_status.outputs.exists == '0' }}
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6
+
+      - name: setup node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: check appdmg npm package version
+        id: appdmg_publish_status
+        uses: tehpsalmist/npm-publish-status-action@01cb25946b194a7a5468f22c8e74db04c283f121
+
+      - name: prepare cli package metadata
+        run: |
+          cp package.json package.appdmg.json
+          cp packages/cli/package.json package.json
+
+      - name: check cli npm package version
+        id: cli_publish_status
+        uses: tehpsalmist/npm-publish-status-action@01cb25946b194a7a5468f22c8e74db04c283f121
+
+      - name: report npm package version status
+        run: |
+          appdmg_name="$(node -p "require('./package.appdmg.json').name")"
+          appdmg_version="$(node -p "require('./package.appdmg.json').version")"
+          cli_name="$(node -p "require('./package.json').name")"
+          cli_version="$(node -p "require('./package.json').version")"
+
+          if [ "${{ steps.appdmg_publish_status.outputs.exists }}" = "1" ]; then
+            echo "${appdmg_name}@${appdmg_version} was published while this workflow was verifying."
+          elif [ "${{ steps.appdmg_publish_status.outputs.exists }}" = "0" ]; then
+            echo "${appdmg_name}@${appdmg_version} is still not published."
+          else
+            echo "::error::Unexpected appdmg npm publish status: ${{ steps.appdmg_publish_status.outputs.exists }}"
+            exit 1
+          fi
+
+          if [ "${{ steps.cli_publish_status.outputs.exists }}" = "1" ]; then
+            echo "${cli_name}@${cli_version} was published while this workflow was verifying."
+          elif [ "${{ steps.cli_publish_status.outputs.exists }}" = "0" ]; then
+            echo "${cli_name}@${cli_version} is still not published."
+          else
+            echo "::error::Unexpected cli npm publish status: ${{ steps.cli_publish_status.outputs.exists }}"
+            exit 1
+          fi
+
+          if [ "${{ steps.appdmg_publish_status.outputs.exists }}" = "1" ] || [ "${{ steps.cli_publish_status.outputs.exists }}" = "1" ]; then
+            echo "At least one package version is already published; exiting without publishing."
+          else
+            echo "Both package versions are still not published; continuing."
+          fi
+
+  publish:
+    name: publish to npmjs
+    needs: prepublish_check
+    if: needs.prepublish_check.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6
+
+      - name: setup node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
 
       - name: pack appdmg package
         id: pack_appdmg
